@@ -1,17 +1,17 @@
-#!/usr/bin/env python
-#coding:utf-8
-"""
-  Author:  yafeile --<yafeile@163.com>
-  Purpose: 
-  Created: Tuesday, March 15, 2016
-"""
+#!/usr/bin/env python3
+# coding:utf-8
+'''
+新浪短链API
+官方网站:http://dwz.wailian.work/
 
-from urllib2 import Request, urlopen, build_opener, HTTPCookieProcessor, install_opener
-from urlparse import urljoin, urlparse
-from urllib import urlencode, unquote
+todo: 频率高了之后会触发滑动验证码.
+'''
+
 from base64 import b64encode
 from json import loads
-from cookielib import CookieJar
+from urllib.parse import urlparse
+
+import requests
 
 TYPES = {
     "sina.it": "sinalt",
@@ -28,36 +28,56 @@ TYPES = {
     "bit.ly": "bitly",
 }
 
-def generate(url, suffix = None):
-    """生成新浪的短链接"""
-    scheme = urlparse(url).scheme
-    if not scheme:
-        url = 'http://' + url
-    host = "http://dwz.wailian.work"
-    site = TYPES.get(suffix, "sina")
-    url = b64encode(url)
-    params = [("url", url), ("site", site)]
-    params = unquote(urlencode(params))
-    url = urljoin(host, "api.php?{0}".format(params))
-    headers= [
-        ("Accept", "application/json,text/javascript,*/*;q=0.01"),
-        ("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:30.0) Gecko/20100101 Firefox/30.0"),
-        ("Referer", 'dwz.wailian.work'),
-        ("Connection", "keep-alive")
-    ]
-    cookie = CookieJar()
-    opener = build_opener(HTTPCookieProcessor(cookie))
-    opener.addheaders = headers
-    f = opener.open(host).read()
-    f = opener.open(url)
-    data = f.read()
-    if data:
-        data = loads(data)
-    status = data['result']
-    if status.lower() == 'ok':
-        return data['data']
-    else:
-        return 'Error:'.format(data['data'])
-    
+
+class SinaShortUrl():
+    def __init__(self):
+        self.cookies = requests.session().get('http://dwz.wailian.work/',timeout=20).cookies
+
+    def generator(self, url, suffix=None):
+        # 检查url是否输入了http://前缀
+        scheme = urlparse(url).scheme
+        if not scheme:
+            url = 'http://' + url
+
+        # base64编码用户输入的url
+        url = b64encode(url.encode()).decode()
+        # 确定用户需要的短链类型
+        site = TYPES.get(suffix, "sina")
+        # 拼接请求url
+        requests_url = "http://dwz.wailian.work/api.php?url={url}&site={site}".format(url=url, site=site)
+
+        # 构造header
+        headers = {
+            'host': "dwz.wailian.work",
+            'connection': "keep-alive",
+            'accept': "application/json, text/javascript, */*; q=0.01",
+            'x-requested-with': "XMLHttpRequest",
+            'user-agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.91 Safari/537.36",
+            'referer': "http://dwz.wailian.work/",
+            'accept-encoding': "gzip, deflate",
+            'accept-language': "zh-CN,zh;q=0.8",
+            'cache-control': "no-cache",
+        }
+
+        # 请求
+        response = requests.request("GET", requests_url, headers=headers, cookies=self.cookies)
+
+        # 结果判定
+        if response.status_code == 200:
+            result = loads(response.content)
+
+            result_status = result['result']
+            result_url = result['data'].get('short_url')
+
+            if result_status.lower() == 'ok':
+                return result_url
+
+        print('未成功')
+        print(response.content)
+        return False
+
+
 if __name__ == '__main__':
-    print generate('https://www.baidu.com', suffix="sina.it")
+    test = SinaShortUrl()
+    print(test.generator('www.baidu.com'))
+    print(test.generator('http://xinxidawang.xyz/wo/long_url/1'))
