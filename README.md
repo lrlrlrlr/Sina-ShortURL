@@ -34,5 +34,5 @@
 返回的结果可能如下:
 
 ```
-'http://t.cn/xxxx', 
+'http://t.cn/xxxx'
 ```
