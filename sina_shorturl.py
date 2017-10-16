@@ -7,12 +7,15 @@
 todo: 频率高了之后会触发滑动验证码.
 '''
 
+
 from base64 import b64encode
 from json import loads
 from urllib.parse import urlparse
 
+import time
+import hashlib
 import requests
-
+from urllib import parse
 TYPES = {
     "sina.it": "sinalt",
     "t.cn": "sina",
@@ -30,10 +33,12 @@ TYPES = {
 
 
 class SinaShortUrl():
-    def __init__(self):
-        self.cookies = requests.session().get('http://dwz.wailian.work/',timeout=20).cookies
 
     def generator(self, url, suffix=None):
+        '''官方生成短链的API,请求多了之后会出验证码~'''
+        # 检查是否存在cookies,如无,则构造一个.
+        if not self.cookies:
+            self.cookies = requests.session().get('http://dwz.wailian.work/', timeout=20).cookies
         # 检查url是否输入了http://前缀
         scheme = urlparse(url).scheme
         if not scheme:
@@ -75,6 +80,42 @@ class SinaShortUrl():
         print('未成功')
         print(response.content)
         return False
+
+    @staticmethod
+    def generator_mynb8(url):
+        '''用于生成短链的第三方API,说明文档http://www.mynb8.com/wiki/sina.html'''
+        APPKEY = '5414cc56366fa5089f0bb0778eca4024'
+        LONG_URL = urlEncode(url)
+        SIGN = md5Encode(APPKEY + md5Encode(LONG_URL))
+
+        request_url = 'http://www.mynb8.com/api/sina?appkey={APPKEY}&sign={SIGN}&long_url={LONG_URL}'.format(
+            APPKEY=APPKEY,
+            LONG_URL=LONG_URL,
+            SIGN=SIGN
+        )
+
+        r = requests.get(request_url, timeout=30)
+        while r.text == "访问太频繁，两次访问最少相隔8秒":
+            time.sleep(15)
+            r = requests.get(request_url, timeout=30)
+
+        if r.status_code == 200:
+            try:
+                result = loads(r.content)
+                return result.get('data').get('short_url')
+            except:
+                return r.text
+
+
+def md5Encode(str):
+    m = hashlib.md5()
+    m.update(str.encode())
+    return m.hexdigest()
+
+
+def urlEncode(str):
+    '''用于转义, 注意下面这个safe,如果不设置的话就不会转义/这个符号'''
+    return parse.quote(str.encode(), safe='')
 
 
 if __name__ == '__main__':
